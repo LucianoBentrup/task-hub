@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { Alert, View, TextInput, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
+import AppHeader from '../components/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateEventInSupabase } from '../database/supabase';
 
 const EditEventScreen = () => {
   const route = useRoute();
@@ -18,6 +19,7 @@ const EditEventScreen = () => {
   const [location, setLocation] = useState(event.location);
   const [organizer, setOrganizer] = useState(event.organizer);
   const [description, setDescription] = useState(event.description);
+  const [isSaving, setIsSaving] = useState(false);
   const navigation = useNavigation();
 
   const onDateChange = (event, selectedDate) => {
@@ -52,32 +54,45 @@ const EditEventScreen = () => {
   };
 
   const handleSaveEvent = async () => {
+    if (!name.trim()) {
+      Alert.alert('Campo obrigatorio', 'Informe o nome do evento.');
+      return;
+    }
+
     const updatedEvent = {
       ...event,
-      name,
+      name: name.trim(),
       date: date.toISOString().split('T')[0],
       startTime: formatTime(startTime),
       endTime: formatTime(endTime),
-      location,
-      organizer,
-      description
+      location: location.trim(),
+      organizer: organizer.trim(),
+      description: description.trim(),
     };
 
     try {
-      const storedEvents = await AsyncStorage.getItem('events');
-      const events = storedEvents ? JSON.parse(storedEvents) : [];
-      const eventIndex = events.findIndex(e => e.date === event.date && e.name === event.name);
-      events[eventIndex] = updatedEvent;
-      await AsyncStorage.setItem('events', JSON.stringify(events));
+      setIsSaving(true);
+      const { error } = await updateEventInSupabase(event.id, updatedEvent);
+
+      if (error) {
+        Alert.alert('Erro ao salvar', error.message);
+        return;
+      }
+
+      Alert.alert('Sucesso', 'Evento atualizado com sucesso');
       navigation.navigate('ManageEvents');
     } catch (e) {
-      console.error("Error saving event: ", e);
+      console.error('Erro ao atualizar evento: ', e);
+      Alert.alert('Erro ao salvar', 'Não foi possível atualizar o evento.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Editar Evento</Text>
+    <View style={{ flex: 1 }}>
+      <AppHeader title="Editar Evento" />
+      <ScrollView contentContainerStyle={styles.container}>
       <TextInput
         style={styles.input}
         placeholder="Nome do Evento"
@@ -136,10 +151,11 @@ const EditEventScreen = () => {
         onChangeText={setDescription}
         multiline
       />
-      <TouchableOpacity onPress={handleSaveEvent} style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Salvar</Text>
+      <TouchableOpacity onPress={handleSaveEvent} style={styles.saveButton} disabled={isSaving}>
+        <Text style={styles.saveButtonText}>{isSaving ? 'Salvando...' : 'Salvar'}</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 

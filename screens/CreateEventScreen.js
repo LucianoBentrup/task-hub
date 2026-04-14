@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { Alert, View, TextInput, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { insertEventToSupabase } from '../database/supabase';
 
 const CreateEventScreen = () => {
   const [name, setName] = useState('');
@@ -15,6 +16,7 @@ const CreateEventScreen = () => {
   const [location, setLocation] = useState('');
   const [organizer, setOrganizer] = useState('');
   const [description, setDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const navigation = useNavigation();
 
   const onDateChange = (event, selectedDate) => {
@@ -49,30 +51,44 @@ const CreateEventScreen = () => {
   };
 
   const handleSaveEvent = async () => {
+    if (!name.trim()) {
+      Alert.alert('Campo obrigatorio', 'Informe o nome do evento.');
+      return;
+    }
+
     const event = {
-      name,
+      name: name.trim(),
       date: date.toISOString().split('T')[0],
       startTime: formatTime(startTime),
       endTime: formatTime(endTime),
-      location,
-      organizer,
-      description
+      location: location.trim(),
+      organizer: organizer.trim(),
+      description: description.trim(),
     };
-    
+
     try {
-      const existingEvents = await AsyncStorage.getItem('events');
-      const events = existingEvents ? JSON.parse(existingEvents) : [];
-      events.push(event);
-      await AsyncStorage.setItem('events', JSON.stringify(events));
-      navigation.navigate('Home', { events });
+      setIsSaving(true);
+      const { error } = await insertEventToSupabase(event);
+
+      if (error) {
+        Alert.alert('Erro ao salvar', error.message);
+        return;
+      }
+
+      Alert.alert('Sucesso', 'Evento criado com sucesso');
+      navigation.navigate('ManageEvents');
     } catch (e) {
-      console.error("Error saving event: ", e);
+      console.error('Erro ao salvar evento: ', e);
+      Alert.alert('Erro ao salvar', 'Não foi possível salvar o evento.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Criar Evento</Text>
+    <View style={{ flex: 1 }}>
+      <AppHeader title="Criar Evento" />
+      <ScrollView contentContainerStyle={styles.container}>
       <TextInput
         style={styles.input}
         placeholder="Nome do Evento"
@@ -131,10 +147,11 @@ const CreateEventScreen = () => {
         onChangeText={setDescription}
         multiline
       />
-      <TouchableOpacity onPress={handleSaveEvent} style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Salvar</Text>
+      <TouchableOpacity onPress={handleSaveEvent} style={styles.saveButton} disabled={isSaving}>
+        <Text style={styles.saveButtonText}>{isSaving ? 'Salvando...' : 'Salvar'}</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 

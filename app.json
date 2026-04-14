@@ -2,6 +2,7 @@
   "expo": {
     "name": "TaskHub",
     "slug": "TaskHub",
+    "scheme": "taskhub",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,13 +13,20 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lucia.taskhub"
     },
     "android": {
+      "package": "com.lucia.taskhub",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       }
+    },
+    "extra": {
+      "APP_SCHEME": "taskhub",
+      "SUPABASE_URL": "https://kncfgepymkgnccjcjxgv.supabase.co",
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuY2ZnZXB5bWtnbmNjamNqeGd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMTYxOTgsImV4cCI6MjA5MTY5MjE5OH0.GkNK9smu6_g5HED8QVABVn5OghS-n9fvfHU0h8GQALU"
     },
     "web": {
       "favicon": "./assets/favicon.png"

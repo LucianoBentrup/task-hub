@@ -1,77 +1,170 @@
 # TaskHub
 
-TaskHub é uma aplicação de gerenciamento de tarefas e eventos desenvolvida em React Native.
+TaskHub é um aplicativo mobile para gerenciamento de eventos e tarefas, construído com Expo e React Native, com autenticação via Supabase, login com Google e exportação para o Google Calendar.
 
-## Pré-requisitos
+## Resumo
 
-Certifique-se de que você tenha as seguintes ferramentas instaladas em sua máquina:
+Neste projeto eu uso Expo no fluxo de desenvolvimento e mantenho a pasta nativa Android versionada para execução com `expo run:android`.
 
-- [Node.js](https://nodejs.org/) (versão LTS recomendada)
-- [npm](https://www.npmjs.com/) ou [yarn](https://yarnpkg.com/)
-- [Git](https://git-scm.com/)
-- [Android Studio](https://developer.android.com/studio) (para rodar no Android)
-- [Xcode](https://developer.apple.com/xcode/) (para rodar no iOS, apenas no macOS)
-- [CocoaPods](https://cocoapods.org/) (apenas para iOS, instale usando `sudo gem install cocoapods`)
+O que já está funcionando aqui:
 
-## Clonando o Repositório
+- Autenticação com e-mail e senha
+- Login com Google via Supabase
+- Cadastro, edição e remoção de eventos
+- Estrutura preparada para isolamento de dados por usuário com RLS no Supabase
+- Exportação de eventos para o Google Calendar
+- Fallback local para compatibilidade com fluxos antigos
 
-Para começar, clone o repositório do projeto e navegue até o diretório do projeto:
+## Stack
+
+- Expo 51
+- React Native 0.74
+- React Navigation
+- Supabase
+- Expo Auth Session
+- Expo SQLite
+
+## Requisitos
+
+Para rodar o projeto ou avaliar o repositório, esse é o setup base:
+
+- Node.js LTS
+- npm
+- Git
+- Android Studio
+- SDK Android com `platform-tools`
+- Java 17 ou a JBR do Android Studio
+
+## Quick Start
+
+Se a ideia for testar rápido, esse é o fluxo:
 
 ```sh
-git clone <URL-do-seu-repositório>
-cd <nome-do-seu-repositório>
-```
-
-## Instalando Dependências
-Instale todas as dependências do projeto usando npm ou yarn:
-
-```sh
+git clone <url-do-repositorio>
+cd task-hub
 npm install
-```
-# ou
-```sh
-yarn install
+npx expo start -c
 ```
 
-## Instalando Dependências do CocoaPods (Apenas para iOS)
-Se você estiver rodando o projeto em um dispositivo iOS ou emulador, precisará instalar as dependências do CocoaPods:
+Com dispositivo conectado ou emulador aberto:
 
 ```sh
-cd ios
-pod install
-cd ..
+npx expo run:android
 ```
 
-## Iniciando o Metro Bundler
-Inicie o Metro Bundler, que é o servidor de desenvolvimento para React Native:
+Há também um script web no projeto, mas hoje o foco real de uso e validação está no Android.
+
+## Scripts
+
+Os scripts atuais do projeto são estes:
 
 ```sh
-npx react-native start
+npm run start
+npm run android
+npm run ios
+npm run web
 ```
 
-## Rodando o Projeto
+Observação:
 
-# Android
-Para rodar o projeto em um dispositivo Android ou emulador, use o seguinte comando:
+O script `ios` existe no `package.json`, mas este repositório não mantém a pasta `ios/` versionada. Hoje o foco prático do projeto está no Android.
 
-```sh
-npx react-native run-android
+O script `web` também existe, mas não é o fluxo principal documentado aqui.
+
+## Configuração
+
+As credenciais do app são lidas de `expo.extra`, que hoje está definido em `app.json`.
+
+Os campos usados atualmente são:
+
+- `APP_SCHEME`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+O formato esperado hoje é este:
+
+```json
+{
+  "expo": {
+    "extra": {
+      "APP_SCHEME": "taskhub",
+      "SUPABASE_URL": "https://seu-projeto.supabase.co",
+      "SUPABASE_ANON_KEY": "sua-chave-anon"
+    }
+  }
+}
 ```
 
-## iOS
-Para rodar o projeto em um dispositivo iOS ou emulador, use o seguinte comando (lembre-se de que você precisará de um macOS para rodar em dispositivos iOS):
+Nota para repositório público:
 
-```sh
-npx react-native run-ios
+`SUPABASE_ANON_KEY` não é uma chave secreta de backend, mas mesmo assim faz mais sentido evitar valor real hardcoded quando o projeto vai ficar público. Se este repositório for publicado abertamente, o caminho mais limpo é migrar essa configuração para `app.config.js` com `.env` e manter um `.env.example` no repositório.
+
+## Banco e migrações
+
+Os arquivos de apoio para Supabase ficam em `database/`:
+
+- `supabase-schema.sql`
+- `supabase-rls-migration.sql`
+- `supabase-oauth-migration.sql`
+
+Eles cobrem hoje:
+
+- Estrutura de `users`
+- Estrutura de `events`
+- Políticas de Row Level Security
+- Ajuste de autenticação para login social
+
+## Estrutura do projeto
+
+```text
+App.js
+components/
+database/
+navigation/
+screens/
+android/
 ```
 
-## Snack Expo (Online)
+Resumo por pasta:
 
-Se você preferir rodar o projeto no [Snack Expo](https://snack.expo.dev), você pode importar o repositório Git diretamente. Siga as instruções abaixo:
+- `components/`: Componentes reutilizáveis separados da lógica das telas
+- `database/`: Integração com Supabase, SQLite e scripts SQL
+- `navigation/`: Apoio à navegação
+- `screens/`: Telas principais do app
+- `android/`: Projeto nativo Android usado com `expo run:android`
 
-- Acesse o [Snack Expo](https://snack.expo.dev).
-- Clique no ícone de menu e selecione "Import git repository".
-- Insira o URL do repositório Git do projeto.
+## Fluxo atual
+
+Autenticação:
+
+- A sessão do Supabase é restaurada ao abrir o app
+- O perfil é sincronizado após login
+- Os tokens do Google podem ser reaproveitados para exportação ao Calendar quando necessário
+
+Dados:
+
+- Os eventos são persistidos com `user_id`
+- Leituras e alterações seguem a estrutura prevista para RLS no Supabase
+- Parte do fluxo local ainda existe como fallback
+
+## Versionamento
+
+O `.gitignore` já foi ajustado para o cenário atual do projeto.
+
+Hoje a regra é:
+
+- Ignorar cache, logs, builds e arquivos locais de máquina
+- Manter o código Android versionado
+- Evitar subir artefatos gerados automaticamente
+
+Antes de publicar no GitHub, ainda vale revisar principalmente:
+
+- `app.json`
+- Credenciais e valores reais de ambiente
+- Arquivos SQL de migração
+- Histórico de commits, caso dados de configuração antigos já tenham sido versionados
+
+
 
 
 

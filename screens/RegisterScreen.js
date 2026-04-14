@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Alert, View, TextInput, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { addUser } from '../database/database';
+import { signUpWithEmailPassword } from '../database/supabase';
 
 const RegisterScreen = () => {
     const [name, setName] = useState('');
@@ -10,19 +10,49 @@ const RegisterScreen = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
     const navigation = useNavigation();
 
-    const handleRegister = () => {
-        if (password === confirmPassword) {
-            addUser(email, password, (success) => {
-                if (success) {
-                    navigation.navigate('Login');
-                } else {
-                    setError('Falha no cadastro');
-                }
-            });
-        } else {
+    const handleRegister = async () => {
+        if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+            setError('Preencha todos os campos');
+            return;
+        }
+
+        if (password !== confirmPassword) {
             setError('As senhas não conferem');
+            return;
+        }
+
+        try {
+            setIsSaving(true);
+            setError('');
+
+            const { data, error: supabaseError } = await signUpWithEmailPassword({
+                name: name.trim(),
+                email: email.trim(),
+                password,
+            });
+
+            if (supabaseError) {
+                setError(supabaseError.message);
+                return;
+            }
+
+            const successMessage = data?.session
+                ? 'Conta criada com sucesso'
+                : 'Conta criada com sucesso. Se o Supabase estiver exigindo confirmação de e-mail, confirme seu e-mail antes de entrar.';
+
+            Alert.alert('Sucesso', successMessage, [
+                {
+                    text: 'OK',
+                    onPress: () => navigation.navigate('Login'),
+                },
+            ]);
+        } catch (e) {
+            setError('Não foi possível concluir o cadastro');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -73,8 +103,8 @@ const RegisterScreen = () => {
                 />
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <TouchableOpacity onPress={handleRegister} style={styles.button}>
-                <Text style={styles.buttonText}>Criar conta</Text>
+            <TouchableOpacity onPress={handleRegister} style={styles.button} disabled={isSaving}>
+                <Text style={styles.buttonText}>{isSaving ? 'Criando conta...' : 'Criar conta'}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.backButton}>
                 <Text style={styles.backButtonText}>Voltar</Text>

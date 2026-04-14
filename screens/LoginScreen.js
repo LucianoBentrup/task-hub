@@ -1,28 +1,69 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, View, TextInput, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { verifyUser } from '../database/database';
+import { signInWithEmailPassword, signInWithGoogle } from '../database/supabase';
 
 const LoginScreen = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [isEmailLoading, setIsEmailLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const navigation = useNavigation();
 
-    const handleLogin = () => {
-        verifyUser(email, password, (isValid) => {
-            if (isValid) {
-                navigation.navigate('Main');
-            } else {
-                setError('Email ou senha incorretos');
+    const handleLogin = async () => {
+        if (!email.trim() || !password.trim()) {
+            setError('Preencha e-mail e senha');
+            return;
+        }
+
+        try {
+            setIsEmailLoading(true);
+            const { error: loginError } = await signInWithEmailPassword({
+                email: email.trim(),
+                password,
+            });
+
+            if (loginError) {
+                const localUserIsValid = await new Promise((resolve) => {
+                    verifyUser(email.trim().toLowerCase(), password, (isValid) => resolve(isValid));
+                });
+
+                if (localUserIsValid && __DEV__) {
+                    Alert.alert('Conta local de teste', 'Essa conta existe apenas no modo de desenvolvimento.');
+                    return;
+                }
+
+                setError(loginError.message || 'E-mail ou senha incorretos');
+                return;
             }
-        });
+
+            setError('');
+        } finally {
+            setIsEmailLoading(false);
+        }
     };
 
-    const handleGoogleLogin = () => {
-        // Adicionar funcionalidade de login com Google aqui
+    const handleGoogleLogin = async () => {
+        try {
+            setIsGoogleLoading(true);
+            setError('');
+
+            const { error: googleError } = await signInWithGoogle();
+
+            if (googleError) {
+                setError(googleError.message || 'Nao foi possivel entrar com Google agora.');
+            }
+        } finally {
+            setIsGoogleLoading(false);
+        }
+    };
+
+    const handleForgotPassword = () => {
+        Alert.alert('Recuperação de senha', 'A recuperação de senha será conectada ao Supabase na próxima etapa.');
     };
 
     return (
@@ -52,19 +93,19 @@ const LoginScreen = () => {
                     <Icon name={showPassword ? "eye" : "eye-slash"} size={20} color="black" />
                 </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotPassword}>
+            <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
                 <Text style={styles.forgotPasswordText}>Esqueceu sua senha? <Text style={styles.forgotPasswordLink}>Clique aqui!</Text></Text>
             </TouchableOpacity>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <TouchableOpacity onPress={handleLogin} style={styles.button}>
-                <Text style={styles.buttonText}>Entrar</Text>
+            <TouchableOpacity onPress={handleLogin} style={styles.button} disabled={isEmailLoading || isGoogleLoading}>
+                {isEmailLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.button}>
                 <Text style={styles.buttonText}>Criar conta</Text>
             </TouchableOpacity>
             <Text style={styles.orText}>OU</Text>
-            <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
-                <Text style={styles.googleButtonText}>Logar com o Google</Text>
+            <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton} disabled={isEmailLoading || isGoogleLoading}>
+                {isGoogleLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.googleButtonText}>Entrar com Google</Text>}
             </TouchableOpacity>
         </View>
     );

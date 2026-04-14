@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  Alert,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
+import AppHeader from '../components/AppHeader';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
+import { getEventsFromSupabase, signOutFromSupabase } from '../database/supabase';
 
-// Configure locale for the calendar
+// Mantém o calendário no padrão pt-BR em toda a tela.
 LocaleConfig.locales['pt-br'] = {
   monthNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
   monthNamesShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
@@ -15,25 +22,28 @@ LocaleConfig.locales['pt-br'] = {
 };
 LocaleConfig.defaultLocale = 'pt-br';
 
-const HomeScreen = ({ route }) => {
+const HomeScreen = () => {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
-  const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
   const [events, setEvents] = useState([]);
 
+  // Recarrega a lista ao voltar para a tela.
   useEffect(() => {
-    if (isFocused) {
-      fetchEvents();
-    }
+    if (isFocused) fetchEvents();
   }, [isFocused]);
 
   const fetchEvents = async () => {
     try {
-      const storedEvents = await AsyncStorage.getItem('events');
-      const events = storedEvents ? JSON.parse(storedEvents) : [];
-      setEvents(events);
+      const { data, error } = await getEventsFromSupabase();
+      if (error) {
+        console.error('Erro ao carregar eventos: ', error);
+        return;
+      }
+
+      setEvents(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error("Error fetching events: ", e);
+      console.error('Erro ao carregar eventos: ', e);
     }
   };
 
@@ -52,36 +62,51 @@ const HomeScreen = ({ route }) => {
     navigation.navigate('EventDetail', { event });
   };
 
-  const handleLogout = () => {
-    navigation.navigate('Login'); // Navigate back to Login screen
+  const handleLogout = async () => {
+    const { error } = await signOutFromSupabase();
+
+    if (error) {
+      Alert.alert('Erro ao sair', error.message);
+    }
   };
 
-  const markedDates = {
-    [selectedDay]: { selected: true, selectedColor: 'blue' },
-  };
+  const markedDates = events.reduce((accumulator, event) => {
+    if (!event.date) {
+      return accumulator;
+    }
+
+    accumulator[event.date] = {
+      ...(accumulator[event.date] || {}),
+      marked: true,
+      dotColor: '#2563eb',
+    };
+
+    return accumulator;
+  }, {});
+
+  if (selectedDay) {
+    markedDates[selectedDay] = {
+      ...(markedDates[selectedDay] || {}),
+      selected: true,
+      selectedColor: '#0f766e',
+    };
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.openDrawer()} style={styles.menuButton}>
-          <Icon name="bars" size={24} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.headerText}>Task Hub</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Icon name="sign-out" size={24} color="black" />
-        </TouchableOpacity>
-      </View>
+      <AppHeader title="Task Hub" rightIconName="sign-out" onRightPress={handleLogout} />
       <Calendar 
         current={new Date().toISOString().split('T')[0]} 
         onDayPress={handleDayPress}
         monthFormat={'MMMM yyyy'}
-        onMonthChange={(month) => { console.log('month changed', month) }}
+        onMonthChange={() => {}}
         hideExtraDays={true}
         firstDay={1}
         showWeekNumbers={false}
         onPressArrowLeft={subtractMonth => subtractMonth()}
         onPressArrowRight={addMonth => addMonth()}
         disableAllTouchEventsForDisabledDays={true}
+        enableSwipeMonths={true}
         markedDates={markedDates}
         theme={{
           backgroundColor: '#fff',
@@ -98,12 +123,16 @@ const HomeScreen = ({ route }) => {
         <View style={styles.eventBox}>
           <Text style={styles.selectedDayText}>{formatDate(selectedDay)}</Text>
           <ScrollView>
-            {eventsForSelectedDay.map((event, index) => (
-              <TouchableOpacity key={index} style={styles.eventItem} onPress={() => handleEventPress(event)}>
-                <Text style={styles.eventName}>{event.name}</Text>
-                <Text style={styles.eventTime}>{event.startTime} - {event.endTime}</Text>
-              </TouchableOpacity>
-            ))}
+            {eventsForSelectedDay.length > 0 ? (
+              eventsForSelectedDay.map((event) => (
+                <TouchableOpacity key={event.id} style={styles.eventItem} onPress={() => handleEventPress(event)}>
+                  <Text style={styles.eventName}>{event.name}</Text>
+                  <Text style={styles.eventTime}>{event.startTime} - {event.endTime}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>Nenhum evento cadastrado para esta data.</Text>
+            )}
           </ScrollView>
         </View>
       )}
@@ -115,23 +144,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-    backgroundColor: '#f7f7f7',
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  menuButton: {
-    marginLeft: 10,
-  },
-  logoutButton: {
-    marginRight: 10,
   },
   eventBox: {
     flex: 1,
@@ -162,6 +174,10 @@ const styles = StyleSheet.create({
   eventTime: {
     fontSize: 14,
     color: '#555',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#64748b',
   },
 });
 
