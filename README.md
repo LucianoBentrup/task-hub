@@ -17,8 +17,8 @@ O que já está funcionando aqui:
 
 ## Stack
 
-- Expo 51
-- React Native 0.74
+- Expo
+- React Native
 - React Navigation
 - Supabase
 - Expo Auth Session
